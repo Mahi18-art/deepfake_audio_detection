@@ -311,9 +311,13 @@ if uploaded:
         import subprocess
         if uploaded.name.endswith('.m4a') or uploaded.name.endswith('.mp4') or uploaded.name.endswith('.ogg'):
             wav_path = tmp_path.replace(os.path.splitext(tmp_path)[1], '.wav')
-            subprocess.run(['ffmpeg', '-i', tmp_path, wav_path, '-y'],
-                           capture_output=True)
-            tmp_path = wav_path
+            result = subprocess.run(['ffmpeg', '-i', tmp_path, '-ar', '16000', '-ac', '1', wav_path, '-y'],
+                                     capture_output=True)
+            if os.path.exists(wav_path):
+                tmp_path = wav_path
+            else:
+                st.error(f'Audio conversion failed. ffmpeg error: {result.stderr.decode()}')
+                st.stop()
 
     
 
