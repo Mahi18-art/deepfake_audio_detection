@@ -10,11 +10,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import tempfile
 import os
+import subprocess
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')
 
-# ── Page Config ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title='Deepfake Audio Detector',
     page_icon='🎙️',
@@ -22,15 +22,11 @@ st.set_page_config(
     initial_sidebar_state='collapsed'
 )
 
-# ── Custom CSS ────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-
     .main { background-color: #0f1117; }
-
     .hero-container {
         text-align: center;
         padding: 2.5rem 1rem 1.5rem 1rem;
@@ -39,128 +35,52 @@ st.markdown("""
         margin-bottom: 2rem;
         border: 1px solid #2d3561;
     }
-    .hero-title {
-        font-size: 2.6rem;
-        font-weight: 700;
-        color: #ffffff;
-        margin: 0.5rem 0 0.3rem 0;
-        letter-spacing: -0.5px;
-    }
-    .hero-subtitle {
-        font-size: 1rem;
-        color: #8892b0;
-        margin: 0;
-    }
-
+    .hero-title { font-size: 2.6rem; font-weight: 700; color: #ffffff; margin: 0.5rem 0 0.3rem 0; }
+    .hero-subtitle { font-size: 1rem; color: #8892b0; margin: 0; }
     .result-genuine {
         background: linear-gradient(135deg, #0d2137 0%, #0a3d2e 100%);
-        border: 2px solid #00d4aa;
-        border-radius: 16px;
-        padding: 2rem;
-        text-align: center;
-        margin: 1.5rem 0;
+        border: 2px solid #00d4aa; border-radius: 16px;
+        padding: 2rem; text-align: center; margin: 1.5rem 0;
     }
     .result-fake {
         background: linear-gradient(135deg, #2d0a0a 0%, #3d1a0a 100%);
-        border: 2px solid #ff4757;
-        border-radius: 16px;
-        padding: 2rem;
-        text-align: center;
-        margin: 1.5rem 0;
+        border: 2px solid #ff4757; border-radius: 16px;
+        padding: 2rem; text-align: center; margin: 1.5rem 0;
     }
-    .result-label {
-        font-size: 2rem;
-        font-weight: 700;
-        margin: 0.5rem 0;
-    }
+    .result-label { font-size: 2rem; font-weight: 700; margin: 0.5rem 0; }
     .result-genuine .result-label { color: #00d4aa; }
     .result-fake .result-label { color: #ff4757; }
-    .result-confidence {
-        font-size: 1rem;
-        color: #8892b0;
-        margin: 0;
-    }
-
+    .result-confidence { font-size: 1rem; color: #8892b0; margin: 0; }
     .score-card {
-        background: #1a1f2e;
-        border: 1px solid #2d3561;
-        border-radius: 12px;
-        padding: 1.2rem;
-        text-align: center;
+        background: #1a1f2e; border: 1px solid #2d3561;
+        border-radius: 12px; padding: 1.2rem; text-align: center;
     }
-    .score-label {
-        font-size: 0.8rem;
-        color: #8892b0;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-bottom: 0.3rem;
-    }
-    .score-value {
-        font-size: 1.8rem;
-        font-weight: 700;
-        margin: 0;
-    }
-
-    .metric-bar {
-        background: #1a1f2e;
-        border: 1px solid #2d3561;
-        border-radius: 12px;
-        padding: 1rem 1.5rem;
-        margin: 0.5rem 0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
+    .score-label { font-size: 0.8rem; color: #8892b0; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.3rem; }
+    .score-value { font-size: 1.8rem; font-weight: 700; margin: 0; }
     .info-box {
-        background: #1a1f2e;
-        border: 1px solid #2d3561;
-        border-radius: 12px;
-        padding: 1.2rem 1.5rem;
-        margin-bottom: 1.5rem;
+        background: #1a1f2e; border: 1px solid #2d3561;
+        border-radius: 12px; padding: 1.2rem 1.5rem; margin-bottom: 1.5rem;
     }
-    .info-title {
-        font-size: 0.85rem;
-        color: #64ffda;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-bottom: 0.5rem;
-    }
-    .info-text {
-        font-size: 0.9rem;
-        color: #8892b0;
-        line-height: 1.6;
-        margin: 0;
-    }
-
+    .info-title { font-size: 0.85rem; color: #64ffda; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.5rem; }
+    .info-text { font-size: 0.9rem; color: #8892b0; line-height: 1.6; margin: 0; }
     div[data-testid="stFileUploader"] {
-        background: #1a1f2e;
-        border: 2px dashed #2d3561;
-        border-radius: 12px;
-        padding: 1rem;
-        transition: border-color 0.3s;
+        background: #1a1f2e; border: 2px dashed #2d3561; border-radius: 12px; padding: 1rem;
     }
-    div[data-testid="stFileUploader"]:hover {
-        border-color: #64ffda;
-    }
-
-    .stAudio { border-radius: 8px; margin: 1rem 0; }
     footer { visibility: hidden; }
     #MainMenu { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
 
 # ── Config ────────────────────────────────────────────────────────────────────
-SR          = 16000
-DURATION    = 4.0
-N_SAMPLES   = int(SR * DURATION)
-N_MFCC      = 40
-N_LFCC      = 40
-HOP_LENGTH  = 160
-N_FFT       = 512
-MODEL_PATH  = 'best_model.pt'
-T_EXPECTED  = 401
+SR         = 16000
+DURATION   = 4.0
+N_SAMPLES  = int(SR * DURATION)
+N_MFCC     = 40
+N_LFCC     = 40
+HOP_LENGTH = 160
+N_FFT      = 512
+MODEL_PATH = 'best_model.pt'
+T_EXPECTED = 401
 
 # ── Model ─────────────────────────────────────────────────────────────────────
 class MFM(nn.Module):
@@ -216,7 +136,7 @@ def extract_features(path):
     feat = np.vstack([lfcc, mfcc]).astype(np.float32)
     feat = (feat - feat.mean(1, keepdims=True)) / (feat.std(1, keepdims=True) + 1e-8)
     if feat.shape[1] < T_EXPECTED:
-        feat = np.pad(feat, ((0,0),(0, T_EXPECTED - feat.shape[1])))
+        feat = np.pad(feat, ((0, 0), (0, T_EXPECTED - feat.shape[1])))
     return feat[:, :T_EXPECTED]
 
 def plot_waveform(path):
@@ -237,7 +157,7 @@ def plot_waveform(path):
 
 def plot_spectrogram(path):
     y, _ = librosa.load(path, sr=SR, duration=DURATION)
-    S = librosa.feature.melspectrogram(y=y, sr=SR, n_mels=64)
+    S    = librosa.feature.melspectrogram(y=y, sr=SR, n_mels=64)
     S_db = librosa.power_to_db(S, ref=np.max)
     fig, ax = plt.subplots(figsize=(8, 2))
     fig.patch.set_facecolor('#1a1f2e')
@@ -273,6 +193,21 @@ def predict(audio_path, model, device):
     label = 'Deepfake (AI-Generated)' if pred == 1 else 'Genuine (Human)'
     return label, probs[pred] * 100, probs
 
+def convert_to_wav(tmp_path, original_name):
+    ext = os.path.splitext(original_name)[1].lower()
+    if ext in ['.m4a', '.mp4', '.ogg', '.opus']:
+        wav_path = tmp_path.replace(os.path.splitext(tmp_path)[1], '.wav')
+        result = subprocess.run(
+            ['ffmpeg', '-y', '-i', tmp_path,
+             '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1', wav_path],
+            capture_output=True
+        )
+        if os.path.exists(wav_path) and os.path.getsize(wav_path) > 0:
+            return wav_path
+        else:
+            raise RuntimeError(f'ffmpeg conversion failed: {result.stderr.decode()[-200:]}')
+    return tmp_path
+
 # ── UI ────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <div class="hero-container">
@@ -282,7 +217,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Info box
 st.markdown("""
 <div class="info-box">
     <div class="info-title">How it works</div>
@@ -297,29 +231,30 @@ st.markdown("""
 model, device = load_model()
 
 if model is None:
-    st.error('⚠️ Model file `best_model.pt` not found.')
+    st.error('Model file best_model.pt not found.')
     st.stop()
 
-uploaded = st.file_uploader('**Upload an audio file**', type=['wav', 'flac', 'mp3', 'm4a', 'ogg'],
-                             help='Supported formats: WAV, FLAC, MP3 (max 200MB)')
+uploaded = st.file_uploader(
+    '**Upload an audio file**',
+    type=['wav', 'flac', 'mp3', 'm4a', 'ogg', 'opus'],
+    help='Supported formats: WAV, FLAC, MP3, M4A, OGG'
+)
 
-if uploaded.name.endswith('.m4a') or uploaded.name.endswith('.mp4') or uploaded.name.endswith('.ogg'):
-            wav_path = tmp_path.replace(os.path.splitext(tmp_path)[1], '.wav')
-            result = subprocess.run(
-                ['ffmpeg', '-y', '-i', tmp_path, '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1', wav_path],
-                capture_output=True
-            )
-            if os.path.exists(wav_path) and os.path.getsize(wav_path) > 0:
-                tmp_path = wav_path
-            else:
-                st.error(f'Conversion failed: {result.stderr.decode()[-300:]}')
-                st.stop()
+if uploaded:
+    suffix = os.path.splitext(uploaded.name)[1]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(uploaded.read())
+        tmp_path = tmp.name
 
-    
+    try:
+        tmp_path = convert_to_wav(tmp_path, uploaded.name)
+    except RuntimeError as e:
+        st.error(str(e))
+        st.stop()
 
     st.audio(uploaded)
 
-    with st.spinner('🔍 Analysing audio...'):
+    with st.spinner('Analysing audio...'):
         try:
             label, confidence, probs = predict(tmp_path, model, device)
             waveform_fig = plot_waveform(tmp_path)
@@ -334,7 +269,7 @@ if uploaded.name.endswith('.m4a') or uploaded.name.endswith('.mp4') or uploaded.
     is_genuine = 'Genuine' in label
 
     if is_genuine:
-        st.markdown(f"""
+        st.markdown("""
         <div class="result-genuine">
             <div style="font-size:2.5rem">✅</div>
             <div class="result-label">Genuine (Human)</div>
@@ -342,7 +277,7 @@ if uploaded.name.endswith('.m4a') or uploaded.name.endswith('.mp4') or uploaded.
         </div>
         """, unsafe_allow_html=True)
     else:
-        st.markdown(f"""
+        st.markdown("""
         <div class="result-fake">
             <div style="font-size:2.5rem">🚨</div>
             <div class="result-label">Deepfake (AI-Generated)</div>
@@ -350,13 +285,13 @@ if uploaded.name.endswith('.m4a') or uploaded.name.endswith('.mp4') or uploaded.
         </div>
         """, unsafe_allow_html=True)
 
-    # Score cards
     col1, col2, col3 = st.columns(3)
     with col1:
+        color = '#00d4aa' if is_genuine else '#ff4757'
         st.markdown(f"""
         <div class="score-card">
             <div class="score-label">Confidence</div>
-            <div class="score-value" style="color:{'#00d4aa' if is_genuine else '#ff4757'}">{confidence:.1f}%</div>
+            <div class="score-value" style="color:{color}">{confidence:.1f}%</div>
         </div>""", unsafe_allow_html=True)
     with col2:
         st.markdown(f"""
@@ -372,15 +307,11 @@ if uploaded.name.endswith('.m4a') or uploaded.name.endswith('.mp4') or uploaded.
         </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    # Visualizations
-    st.markdown("### 📊 Audio Analysis")
+    st.markdown("### Audio Analysis")
     st.pyplot(waveform_fig)
     st.pyplot(spec_fig)
     plt.close('all')
 
-    # Model info
-    st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("""
     <div class="info-box">
         <div class="info-title">Model Performance</div>
