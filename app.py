@@ -310,13 +310,14 @@ if uploaded:
         # Convert m4a to wav if needed
         import subprocess
         if uploaded.name.endswith('.m4a') or uploaded.name.endswith('.mp4') or uploaded.name.endswith('.ogg'):
-            wav_path = tmp_path.replace(os.path.splitext(tmp_path)[1], '.wav')
-            result = subprocess.run(['ffmpeg', '-i', tmp_path, '-ar', '16000', '-ac', '1', wav_path, '-y'],
-                                     capture_output=True)
-            if os.path.exists(wav_path):
+            import soundfile as sf
+            try:
+                y, sr = librosa.load(tmp_path, sr=16000, mono=True)
+                wav_path = tmp_path.replace(os.path.splitext(tmp_path)[1], '.wav')
+                sf.write(wav_path, y, 16000)
                 tmp_path = wav_path
-            else:
-                st.error(f'Audio conversion failed. ffmpeg error: {result.stderr.decode()}')
+            except Exception as conv_err:
+                st.error(f'Conversion error: {conv_err}')
                 st.stop()
 
     
