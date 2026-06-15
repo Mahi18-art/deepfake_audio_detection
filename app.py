@@ -307,12 +307,12 @@ if uploaded:
     with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded.name)[1]) as tmp:
         tmp.write(uploaded.read())
         tmp_path = tmp.name
-        # Convert m4a to wav if needed
-        import subprocess
-        if uploaded.name.endswith('.m4a'):
-            wav_path = tmp_path.replace('.m4a', '.wav')
-            subprocess.run(['ffmpeg', '-i', tmp_path, wav_path, '-y'],
-                           capture_output=True)
+        # m4a/mp4 → wav conversion using pydub
+        if uploaded.name.endswith('.m4a') or uploaded.name.endswith('.mp4'):
+            from pydub import AudioSegment
+            audio = AudioSegment.from_file(tmp_path)
+            wav_path = tmp_path.replace(os.path.splitext(tmp_path)[1], '.wav')
+            audio.export(wav_path, format='wav')
             tmp_path = wav_path
 
     
