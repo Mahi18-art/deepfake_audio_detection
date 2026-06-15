@@ -303,21 +303,16 @@ if model is None:
 uploaded = st.file_uploader('**Upload an audio file**', type=['wav', 'flac', 'mp3', 'm4a', 'ogg'],
                              help='Supported formats: WAV, FLAC, MP3 (max 200MB)')
 
-if uploaded:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded.name)[1]) as tmp:
-        tmp.write(uploaded.read())
-        tmp_path = tmp.name
-        # Convert m4a to wav if needed
-        import subprocess
-        if uploaded.name.endswith('.m4a') or uploaded.name.endswith('.mp4') or uploaded.name.endswith('.ogg'):
-            import soundfile as sf
-            try:
-                y, sr = librosa.load(tmp_path, sr=16000, mono=True)
-                wav_path = tmp_path.replace(os.path.splitext(tmp_path)[1], '.wav')
-                sf.write(wav_path, y, 16000)
+if uploaded.name.endswith('.m4a') or uploaded.name.endswith('.mp4') or uploaded.name.endswith('.ogg'):
+            wav_path = tmp_path.replace(os.path.splitext(tmp_path)[1], '.wav')
+            result = subprocess.run(
+                ['ffmpeg', '-y', '-i', tmp_path, '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1', wav_path],
+                capture_output=True
+            )
+            if os.path.exists(wav_path) and os.path.getsize(wav_path) > 0:
                 tmp_path = wav_path
-            except Exception as conv_err:
-                st.error(f'Conversion error: {conv_err}')
+            else:
+                st.error(f'Conversion failed: {result.stderr.decode()[-300:]}')
                 st.stop()
 
     
