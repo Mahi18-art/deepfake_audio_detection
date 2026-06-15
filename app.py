@@ -300,13 +300,22 @@ if model is None:
     st.error('⚠️ Model file `best_model.pt` not found.')
     st.stop()
 
-uploaded = st.file_uploader('**Upload an audio file**', type=['wav', 'flac', 'mp3'],
+uploaded = st.file_uploader('**Upload an audio file**', type=['wav', 'flac', 'mp3', 'm4a'],
                              help='Supported formats: WAV, FLAC, MP3 (max 200MB)')
 
 if uploaded:
     with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded.name)[1]) as tmp:
         tmp.write(uploaded.read())
         tmp_path = tmp.name
+        # Convert m4a to wav if needed
+        import subprocess
+        if uploaded.name.endswith('.m4a'):
+            wav_path = tmp_path.replace('.m4a', '.wav')
+            subprocess.run(['ffmpeg', '-i', tmp_path, wav_path, '-y'],
+                           capture_output=True)
+            tmp_path = wav_path
+
+    
 
     st.audio(uploaded)
 
